@@ -40,5 +40,7 @@ package org.osflash.signals
 		public var _SignalSplitInterfacesTest:SignalSplitInterfacesTest;
 		public var _SignalTest:SignalTest;
 		public var _SignalWithCustomEventTest:SignalWithCustomEventTest;
+		
+		public var _SignalResponsePairTest:SignalResponsePairTest;
 	}
 }

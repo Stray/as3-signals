@@ -30,7 +30,7 @@ package org.osflash.signals
 		public function SyncSignalResponsePair(responseValueClasses:Array)
 		{
 			// The dispatch will always be the response signal
-			setValueClasses(Signal);
+			super(Signal);
 			_responseValueClasses = responseValueClasses;
 		}
 		
