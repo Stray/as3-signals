@@ -42,5 +42,6 @@ package org.osflash.signals
 		public var _SignalWithCustomEventTest:SignalWithCustomEventTest;
 		
 		public var _SignalResponsePairTest:SignalResponsePairTest;
+		public var _SyncSignalResponsePairTest:SyncSignalResponsePairTest;
 	}
 }

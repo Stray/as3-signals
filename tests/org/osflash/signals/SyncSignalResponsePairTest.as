@@ -8,12 +8,12 @@ package org.osflash.signals
 
 	import flash.display.Sprite;
 
-	public class SignalResponsePairTest
+	public class SyncSignalResponsePairTest
 	{	
 	    [Inject]
 	    public var async:IAsync;
 	    
-		public var responsePair:SignalResponsePair; 
+		public var responsePair:SyncSignalResponsePair; 
 		
 		private const REQUEST_STRING:String = 'RequestTestString';
 		private const REQUEST_SPRITE:Sprite = new Sprite();
@@ -25,7 +25,7 @@ package org.osflash.signals
 		[Before]
 		public function setUp():void
 		{
-			responsePair = new SignalResponsePair([Sprite, String], [String, Number, Sprite]);
+			responsePair = new SyncSignalResponsePair([Sprite, String], [String, Number, Sprite]);
 		}
 
 		[After]
@@ -38,19 +38,17 @@ package org.osflash.signals
 		//////
          
 		[Test]
-		public function get_responseSignal_gives_signal_with_correct_value_classes():void
+		public function get_response_value_classes_gives_correct_values():void
 		{
-			assertTrue('the response signal is a Signal', responsePair.responseSignal is Signal);
-			assertTrue('the response signal is not null', responsePair.responseSignal != null);
-			assertEqualsArrays('the response signal has the required value types', [String, Number, Sprite], responsePair.responseSignal.valueClasses)
+			assertEqualsArrays('the response signal has the required value types', [String, Number, Sprite], responsePair.responseValueClasses);
 		}
 
 		//////
 		
 		[Test]
-		public function get_value_classes_for_request_is_correct():void
+		public function get_value_classes_for_request_includes_the_response_signal():void
 		{
-			assertEqualsArrays('the main signal has the required value types', [Sprite, String], responsePair.valueClasses);
+			assertEqualsArrays('the main signal has the required value types, including the response Signal', [Signal, Sprite, String], responsePair.valueClasses);
 		}
 
 		//////
@@ -73,34 +71,32 @@ package org.osflash.signals
 		//////
 		
 		[Test]
-		public function dispatchRequest_runs_dispatch():void
+		public function dispatchRequest_runs_dispatch_and_includes_signal():void
 		{
 			responsePair.addToRequest(async.add(checkRequestDispatch, 10));
 			responsePair.dispatchRequest(REQUEST_SPRITE, REQUEST_STRING);
 		}
 		
-		private function checkRequestDispatch(sprite:Sprite, str:String):void
+		private function checkRequestDispatch(responseSignal:Signal, sprite:Sprite, str:String):void
 		{
+			assertTrue("Dispatched response signal ok", responseSignal != null);
 			assertEquals("Dispatched sprite ok", REQUEST_SPRITE, sprite);
 			assertEquals("Dispatched string ok", REQUEST_STRING, str);
 		}
 		
-		//////
-
-		[Test]
-		public function addToResponse_adds_to_the_response_signal():void
-		{
-			responsePair.addToResponse(checkResponseDispatch);
-			assertEquals(1, responsePair.responseSignal.numListeners);
-		}
-
 		//////
 		
 		[Test]
 		public function dispatchResponse_runs_dispatch_on_response_signal():void
 		{
 			responsePair.addToResponse(async.add(checkResponseDispatch, 10));
-			responsePair.dispatchResponse(RESPONSE_STRING, RESPONSE_NUMBER, RESPONSE_SPRITE);
+			responsePair.addToRequest(respondToRequest);
+			responsePair.dispatchRequest(REQUEST_SPRITE, REQUEST_STRING);
+		}
+		
+		protected function respondToRequest(responseSignal:Signal, sprite:Sprite, str:String):void
+		{
+			responseSignal.dispatch(RESPONSE_STRING, RESPONSE_NUMBER, RESPONSE_SPRITE);
 		}
 		
 		protected function checkResponseDispatch(str:String, n:Number, sprite:Sprite):void
@@ -127,7 +123,8 @@ package org.osflash.signals
 		public function addToResponseOnce_removes_after_one_dispatch():void
 		{
 			responsePair.addToResponseOnce(async.add(checkResponseDispatch, 10));
-			responsePair.dispatchResponse(RESPONSE_STRING, RESPONSE_NUMBER, RESPONSE_SPRITE);
+			responsePair.addToRequest(respondToRequest);
+			responsePair.dispatchRequest(REQUEST_SPRITE, REQUEST_STRING);
 			assertEquals('Listener has been removed from response signal', 0, responsePair.numResponseListeners);
 		}
 		
@@ -147,10 +144,11 @@ package org.osflash.signals
 		[Test]
 		public function removeFromResponse_removes_correct_listener():void
 		{
+			responsePair.addToRequest(respondToRequest);
 			responsePair.addToResponse(async.add(checkResponseDispatch, 10));
 			responsePair.addToResponse(failIfCalled);
 			responsePair.removeFromResponse(failIfCalled);
-			responsePair.dispatchResponse(RESPONSE_STRING, RESPONSE_NUMBER, RESPONSE_SPRITE);
+			responsePair.dispatchRequest(REQUEST_SPRITE, REQUEST_STRING); 
 		}
 		
 		private function failIfCalled(arg1:*, arg2:*, arg3:*):void
@@ -180,12 +178,13 @@ package org.osflash.signals
 		[Test]
 		public function removeAllFromResponse_removes_correct_listener():void
 		{
+			responsePair.addToRequest(respondToRequest);
 			responsePair.addToResponse(failIfCalled);
 			responsePair.addToResponse(alsoFailIfCalled);
 			responsePair.removeAllFromResponse();
-			responsePair.dispatchResponse(RESPONSE_STRING, RESPONSE_NUMBER, RESPONSE_SPRITE);
+			responsePair.dispatchRequest(REQUEST_SPRITE, REQUEST_STRING); 
  			assertEquals('All listeners have been removed from response signal', 0, responsePair.numResponseListeners);
-   	}
+   		}
 		
 				
 	   
