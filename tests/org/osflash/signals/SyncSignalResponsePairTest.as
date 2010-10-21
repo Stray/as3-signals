@@ -48,7 +48,7 @@ package org.osflash.signals
 		[Test]
 		public function get_value_classes_for_request_includes_the_response_signal():void
 		{
-			assertEqualsArrays('the main signal has the required value types, including the response Signal', [Signal, Sprite, String], responsePair.valueClasses);
+			assertEqualsArrays('the main signal has the required value types, including the response Signal', [ISignalOwnerDispatcher, Sprite, String], responsePair.valueClasses);
 		}
 
 		//////
@@ -77,7 +77,7 @@ package org.osflash.signals
 			responsePair.dispatchRequest(REQUEST_SPRITE, REQUEST_STRING);
 		}
 		
-		private function checkRequestDispatch(responseSignal:Signal, sprite:Sprite, str:String):void
+		private function checkRequestDispatch(responseSignal:ISignalOwnerDispatcher, sprite:Sprite, str:String):void
 		{
 			assertTrue("Dispatched response signal ok", responseSignal != null);
 			assertEquals("Dispatched sprite ok", REQUEST_SPRITE, sprite);
@@ -94,7 +94,7 @@ package org.osflash.signals
 			responsePair.dispatchRequest(REQUEST_SPRITE, REQUEST_STRING);
 		}
 		
-		protected function respondToRequest(responseSignal:Signal, sprite:Sprite, str:String):void
+		protected function respondToRequest(responseSignal:ISignalOwnerDispatcher, sprite:Sprite, str:String):void
 		{
 			responseSignal.dispatch(RESPONSE_STRING, RESPONSE_NUMBER, RESPONSE_SPRITE);
 		}
