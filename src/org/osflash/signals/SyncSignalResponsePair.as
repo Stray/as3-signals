@@ -136,51 +136,11 @@ package org.osflash.signals
 						valueObjectsWithResponseSignal.push(valueObjects[i]);
 					}
 					
-					processDispatch(valueObjectsWithResponseSignal);
+					super.dispatch.apply(this, valueObjectsWithResponseSignal);
 			}
 		}
 		
-		protected function processDispatch(valueObjects:Array):void
-		{
-			
-			
-			switch (valueObjects.length)
-			{
-				case 3:
-					super.dispatch(valueObjects[0], valueObjects[1], valueObjects[2]);
-					break;
-
-				case 4:
-					super.dispatch(valueObjects[0], valueObjects[1], valueObjects[2], valueObjects[3]);
-					break;
-					
-		   	   	case 5:
-					super.dispatch(valueObjects[0], valueObjects[1], valueObjects[2], valueObjects[3], valueObjects[4]);
-					break;
-
-		   	   	case 6:
-					super.dispatch(valueObjects[0], valueObjects[1], valueObjects[2], valueObjects[3], valueObjects[4], valueObjects[5]);
-					break;
-
-		   	   	case 7:
-					super.dispatch(valueObjects[0], valueObjects[1], valueObjects[2], valueObjects[3], valueObjects[4], valueObjects[5], valueObjects[6]);
-					break;
-	        
-		   	   	case 8:
-					super.dispatch(valueObjects[0], valueObjects[1], valueObjects[2], valueObjects[3], valueObjects[4], valueObjects[5], valueObjects[6], valueObjects[7]);
-					break;
-
-		   	   	case 9:
-					super.dispatch(valueObjects[0], valueObjects[1], valueObjects[2], valueObjects[3], valueObjects[4], valueObjects[5], valueObjects[6], valueObjects[7], valueObjects[8]);
-					break;
-                       
-				default:
-					throw new IllegalOperationError('The SyncSignalResponsePair is only set up to handle up to 8 args on dispatch, override the processDispatch function for more');
-			}
-		
-		}
-
-	        
+		    
 		
 	}
 }
