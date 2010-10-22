@@ -16,7 +16,7 @@ package org.osflash.signals
 	public class SyncSignalResponsePair extends Signal
 	{
 		
-		private var _responseSignal:ISignalOwnerDispatcher;
+		private var _responseSignal:ISignalOwner;
 				
 		/**
 		 * Creates a Signal instance to dispatch value objects.
@@ -32,9 +32,9 @@ package org.osflash.signals
 		public function SyncSignalResponsePair(requestValueClasses:Array, responseValueClasses:Array)
 		{
 			// The dispatch will always be the response signal
-			requestValueClasses.unshift(ISignalOwnerDispatcher);
+			requestValueClasses.unshift(ISignalOwner);
 			super(requestValueClasses);
-			_responseSignal = new ResponseSignal(responseValueClasses);
+			_responseSignal = new Signal(responseValueClasses);
 		}
 		
 		public function addToRequest(listener:Function):Function
