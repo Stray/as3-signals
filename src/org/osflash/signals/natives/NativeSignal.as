@@ -1,9 +1,17 @@
 package org.osflash.signals.natives
 {
+	import org.osflash.signals.ISlot;
+	import org.osflash.signals.Slot;
+	import org.osflash.signals.SlotList;
+
 	import flash.errors.IllegalOperationError;
 	import flash.events.Event;
 	import flash.events.IEventDispatcher;
 
+	/** 
+	 * Allows the eventClass to be set in MXML, e.g.
+	 * <natives:NativeSignal id="clicked" eventType="click" target="{this}">{MouseEvent}</natives:NativeSignal>
+	 */
 	[DefaultProperty("eventClass")]	
 	
 	/**
@@ -11,13 +19,14 @@ package org.osflash.signals.natives
 	 * A NativeSignal is essentially a mini-dispatcher locked to a specific event type and class.
 	 * It can become part of an interface.
 	 */
-	public class NativeSignal implements INativeSignalOwner
+	public class NativeSignal implements INativeDispatcher
 	{
 		protected var _target:IEventDispatcher;
 		protected var _eventType:String;
 		protected var _eventClass:Class;
-		protected var listenerBoxes:Array;
-				
+		protected var _valueClasses:Array;
+		protected var slots:SlotList;
+		
 		/**
 		 * Creates a NativeSignal instance to dispatch events on behalf of a target object.
 		 * @param	target The object on whose behalf the signal is dispatching events.
@@ -26,156 +35,193 @@ package org.osflash.signals.natives
 		 */
 		public function NativeSignal(target:IEventDispatcher = null, eventType:String = "", eventClass:Class = null)
 		{
-			_target = target;
-			_eventType = eventType;
-			_eventClass = eventClass || Event;
-			listenerBoxes = [];
+			slots = SlotList.NIL;
+			this.target = target;
+			this.eventType = eventType;
+			this.eventClass = eventClass;
 		}
 		
 		/** @inheritDoc */
 		public function get eventType():String { return _eventType; }
-		/** @inheritDoc */
+
 		public function set eventType(value:String):void { _eventType = value; }
 		
 		/** @inheritDoc */
 		public function get eventClass():Class { return _eventClass; }
-		/** @inheritDoc */
-		public function set eventClass(value:Class):void { _eventClass = value; }
+
+		public function set eventClass(value:Class):void
+		{
+			_eventClass = value || Event;
+			_valueClasses = [_eventClass];
+		}
 		
 		/** @inheritDoc */
-		public function get valueClasses():Array { return [_eventClass]; }
+		[ArrayElementType("Class")]
+		public function get valueClasses():Array { return _valueClasses; }
+
+		public function set valueClasses(value:Array):void
+		{
+			eventClass = value && value.length > 0 ? value[0] : null;
+		}
 		
 		/** @inheritDoc */
-		public function get numListeners():uint { return listenerBoxes.length; }
+		public function get numListeners():uint { return slots.length; }
 		
 		/** @inheritDoc */
 		public function get target():IEventDispatcher { return _target; }
 		
-		/** @inheritDoc */
 		public function set target(value:IEventDispatcher):void
 		{
 			if (value == _target) return;
-			removeAll();
+			if (_target) removeAll();
 			_target = value;
 		}
 		
-		/** @inheritDoc */
-		//TODO: @throws
-		public function add(listener:Function):Function
+		/**
+		 * @inheritDoc
+		 * @throws flash.errors.IllegalOperationError <code>IllegalOperationError</code>: You cannot addOnce() then add() the same listener without removing the relationship first.
+		 * @throws ArgumentError <code>ArgumentError</code>: Given listener is <code>null</code>.
+		 * @throws ArgumentError <code>ArgumentError</code>: Target object cannot be <code>null</code>.
+		 */
+		public function add(listener:Function):ISlot
 		{
-			return addWithPriority(listener)
+			return addWithPriority(listener);
+		}
+		
+		/**
+		 * @inheritDoc
+		 * @throws flash.errors.IllegalOperationError <code>IllegalOperationError</code>: You cannot addOnce() then add() the same listener without removing the relationship first.
+		 * @throws ArgumentError <code>ArgumentError</code>: Given listener is <code>null</code>.
+		 * @throws ArgumentError <code>ArgumentError</code>: Target object cannot be <code>null</code>.
+		 */
+		public function addWithPriority(listener:Function, priority:int = 0):ISlot
+		{
+			return registerListenerWithPriority(listener, false, priority);
+		}
+		
+		/**
+		 * @inheritDoc
+		 * @throws flash.errors.IllegalOperationError <code>IllegalOperationError</code>: You cannot addOnce() then add() the same listener without removing the relationship first.
+		 * @throws ArgumentError <code>ArgumentError</code>: Given listener is <code>null</code>.
+		 * @throws ArgumentError <code>ArgumentError</code>: Target object cannot be <code>null</code>.
+		 */
+		public function addOnce(listener:Function):ISlot
+		{
+			return addOnceWithPriority(listener);
+		}
+		
+		/**
+		 * @inheritDoc
+		 * @throws flash.errors.IllegalOperationError <code>IllegalOperationError</code>: You cannot addOnce() then add() the same listener without removing the relationship first.
+		 * @throws ArgumentError <code>ArgumentError</code>: Given listener is <code>null</code>.
+		 * @throws ArgumentError <code>ArgumentError</code>: Target object cannot be <code>null</code>.
+		 */
+		public function addOnceWithPriority(listener:Function, priority:int = 0):ISlot
+		{
+			return registerListenerWithPriority(listener, true, priority);
 		}
 		
 		/** @inheritDoc */
-		//TODO: @throws
-		public function addWithPriority(listener:Function, priority:int = 0):Function
+		public function remove(listener:Function):ISlot
 		{
-			registerListener(listener, false, priority);
-			return listener;
-		}
-		
-		/** @inheritDoc */
-		public function addOnce(listener:Function):Function
-		{
-			return addOnceWithPriority(listener)
-		}
-		
-		/** @inheritDoc */
-		public function addOnceWithPriority(listener:Function, priority:int = 0):Function
-		{
-			registerListener(listener, true, priority);
-			return listener;
-		}
-		
-		/** @inheritDoc */
-		public function remove(listener:Function):Function
-		{
-			var listenerIndex:int = indexOfListener(listener);
-			if (listenerIndex == -1) return listener;
-			var listenerBox:Object = listenerBoxes.splice(listenerIndex, 1)[0];
-			// For once listeners, execute is a wrapper function around the listener.
-			_target.removeEventListener(_eventType, listenerBox.execute);
-			return listener;
+			const slot:ISlot = slots.find(listener);
+			if (!slot) return null;
+			_target.removeEventListener(_eventType, slot.execute1);
+			slots = slots.filterNot(listener);
+			return slot;
 		}
 		
 		/** @inheritDoc */
 		public function removeAll():void
 		{
-			for (var i:int = listenerBoxes.length; i--; )
+			var slotsToProcess:SlotList = slots;
+			while (slotsToProcess.nonEmpty)
 			{
-				remove(listenerBoxes[i].listener as Function);
+				target.removeEventListener(_eventType, slotsToProcess.head.execute1);
+				slotsToProcess = slotsToProcess.tail;
 			}
+			slots = SlotList.NIL;
 		}
-		
+
+		/**
+		 * @inheritDoc
+		 * @throws ArgumentError <code>ArgumentError</code>: Event object expected.
+		 * @throws ArgumentError <code>ArgumentError</code>: No more than one Event object expected.
+		 * @throws ArgumentError <code>ArgumentError</code>: Target object cannot be <code>null</code>.
+		 * @throws ArgumentError <code>ArgumentError</code>: Event object cannot be <code>null</code>.
+		 * @throws ArgumentError <code>ArgumentError</code>: Event object [event] is not an instance of [eventClass].
+		 * @throws ArgumentError <code>ArgumentError</code>: Event object has incorrect type. Expected [eventType] but was [event.type].
+		 */
+		public function dispatch(...valueObjects):void
+		{
+			//TODO: check if ...valueObjects can ever be null.
+			if (null == valueObjects) throw new ArgumentError('Event object expected.');
+
+			if (valueObjects.length != 1) throw new ArgumentError('No more than one Event object expected.');
+
+			dispatchEvent(valueObjects[0] as Event);
+		}
+
 		/**
 		 * Unlike other signals, NativeSignal does not dispatch null
 		 * because it causes an exception in EventDispatcher.
 		 * @inheritDoc
+		 * @throws ArgumentError <code>ArgumentError</code>: Target object cannot be <code>null</code>.
+		 * @throws ArgumentError <code>ArgumentError</code>: Event object cannot be <code>null</code>.
+		 * @throws ArgumentError <code>ArgumentError</code>: Event object [event] is not an instance of [eventClass].
+		 * @throws ArgumentError <code>ArgumentError</code>: Event object has incorrect type. Expected [eventType] but was [event.type].
 		 */
-		public function dispatch(event:Event):Boolean
+		public function dispatchEvent(event:Event):Boolean
 		{
-			if (!(event is _eventClass))
-				throw new ArgumentError('Event object '+event+' is not an instance of '+_eventClass+'.');
+			if (!target) throw new ArgumentError('Target object cannot be null.');
+			if (!event)  throw new ArgumentError('Event object cannot be null.');
+			
+			if (!(event is eventClass))
+				throw new ArgumentError('Event object '+event+' is not an instance of '+eventClass+'.');
 				
-			if (event.type != _eventType)
-				throw new ArgumentError('Event object has incorrect type. Expected <'+_eventType+'> but was <'+event.type+'>.');
-
-			return _target.dispatchEvent(event);
+			if (event.type != eventType)
+				throw new ArgumentError('Event object has incorrect type. Expected <'+eventType+'> but was <'+event.type+'>.');
+			
+			return target.dispatchEvent(event);
 		}
 		
-		protected function registerListener(listener:Function, once:Boolean = false, priority:int = 0):void
+		protected function registerListenerWithPriority(listener:Function, once:Boolean = false, priority:int = 0):ISlot
 		{
-			// function.length is the number of arguments.
-			if (listener.length != 1)
-				throw new ArgumentError('Listener for native event must declare exactly 1 argument.');
-				
-			var prevListenerIndex:int = indexOfListener(listener);
-			if (prevListenerIndex >= 0)
+			if (!target) throw new ArgumentError('Target object cannot be null.');
+
+			if (registrationPossible(listener, once))
 			{
-				// If the listener was previously added, definitely don't add it again.
-				// But throw an exception in some cases, as the error messages explain.
-				var prevlistenerBox:Object = listenerBoxes[prevListenerIndex];
-				if (prevlistenerBox.once && !once)
+				const slot:ISlot = new Slot(listener, this, once, priority);
+				// Not necessary to insertWithPriority() because the target takes care of ordering.
+				slots = slots.prepend(slot);
+				_target.addEventListener(_eventType, slot.execute1, false, priority);
+				return slot;
+			}
+			
+			return slots.find(listener);
+		}
+
+		protected function registrationPossible(listener:Function, once:Boolean):Boolean
+		{
+			if (!slots.nonEmpty) return true;
+
+			const existingSlot:ISlot = slots.find(listener);
+			if (existingSlot)
+			{
+				if (existingSlot.once != once)
 				{
+					// If the listener was previously added, definitely don't add it again.
+					// But throw an exception if their once value differs.
 					throw new IllegalOperationError('You cannot addOnce() then add() the same listener without removing the relationship first.');
 				}
-				else if (!prevlistenerBox.once && once)
-				{
-					throw new IllegalOperationError('You cannot add() then addOnce() the same listener without removing the relationship first.');
-				}
-				// Listener was already added, so do nothing.
-				return;
+
+				// Listener was already added.
+				return false;
 			}
-			
-			var listenerBox:Object = { listener:listener, once:once, execute:listener };
-			
-			if (once)
-			{
-				var signal:NativeSignal = this;
-				// For once listeners, create a wrapper function to automatically remove the listener.
-				listenerBox.execute = function(event:Event):void
-				{
-					signal.remove(listener);
-					listener(event);
-				};
-			}
-			
-			listenerBoxes[listenerBoxes.length] = listenerBox;
-			_target.addEventListener(_eventType, listenerBox.execute, false, priority);
+
+			// This listener has not been added before.
+			return true;
 		}
-		
-		/**
-		 *
-		 * @param	listener	A handler function that may have been added previously.
-		 * @return	The index of the listener in the listenerBoxes array, or -1 if not found.
-		 */
-		protected function indexOfListener(listener:Function):int
-		{
-			for (var i:int = listenerBoxes.length; i--; )
-			{
-				if (listenerBoxes[i].listener == listener) return i;
-			}
-			return -1;
-		}
+
 	}
 }
